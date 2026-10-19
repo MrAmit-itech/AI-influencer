@@ -1,0 +1,47 @@
+[
+  {
+    "id": "dress_25",
+    "asin": "B0D181145X",
+    "category": "Boho Chikankari & Indo-Western",
+    "title": "RATAN",
+    "price": "₹805",
+    "imageUrl": "https://m.media-amazon.com/images/I/6181b-Z+rzL._SL1200_.jpg",
+    "productUrl": "https://www.amazon.in/dp/B0D181145X?tag=yourtag-21"
+  },
+  {
+    "id": "dress_23",
+    "asin": "B0FC67DSCP",
+    "category": "Boho Chikankari & Indo-Western",
+    "title": "EthnicJunction",
+    "price": "₹659",
+    "imageUrl": "https://m.media-amazon.com/images/I/81IyyCwfI1L._SL1200_.jpg",
+    "productUrl": "https://www.amazon.in/dp/B0FC67DSCP?tag=yourtag-21"
+  },
+  {
+    "id": "dress_13",
+    "asin": "B0CYXWFY1W",
+    "category": "Wedding Lehenga & Sharara",
+    "title": "Xomantic Fashion",
+    "price": "₹1,229",
+    "imageUrl": "https://m.media-amazon.com/images/I/61akl41ybhL._SL1200_.jpg",
+    "productUrl": "https://www.amazon.in/dp/B0CYXWFY1W?tag=yourtag-21"
+  },
+  {
+    "id": "dress_11",
+    "asin": "B0F6NQY9SK",
+    "category": "Wedding Lehenga & Sharara",
+    "title": "Generic",
+    "price": "₹999",
+    "imageUrl": "https://m.media-amazon.com/images/I/61tDOR1xGtL._SL1200_.jpg",
+    "productUrl": "https://www.amazon.in/dp/B0F6NQY9SK?tag=yourtag-21"
+  },
+  {
+    "id": "dress_9",
+    "asin": "B0DB8NSPQF",
+    "category": "Pinterest Organza Floral Midi",
+    "title": "KZULLY",
+    "price": "₹319",
+    "imageUrl": "https://m.media-amazon.com/images/I/71hsUZFJuIL._SL1200_.jpg",
+    "productUrl": "https://www.amazon.in/dp/B0DB8NSPQF?tag=yourtag-21"
+  }
+]
