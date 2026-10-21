@@ -1,8 +1,8 @@
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 
 const {
   ROOT,
@@ -10,32 +10,31 @@ const {
   CHARACTER_IMAGE_PATH,
   DEFAULT_AFFILIATE_TAG,
   CLIP_COUNT,
-} = require('./config');
+} = require("./config");
 
-const {
-  downloadImage,
-  buildAffiliateUrl,
-} = require('./products');
+const { downloadImage, buildAffiliateUrl } = require("./products");
 
 const {
   prepareDressReferenceImage,
   generateSilentModelPrompts,
-} = require('./images');
+} = require("./images");
 
-const { generateClipsInFlow } = require('./flow/generator');
-const { stitchClipsToReel } = require('./video');
-const { postProcessReel } = require('./postprocess');
-const { sendFinalVideoToTelegram } = require('./telegram');
-const { clearGeneratedFolders } = require('./cleanup');
-const { resolveUserChoices: resolveConfiguredChoices } = require('./mode');
+const { generateClipsInFlow } = require("./flow/generator");
+const { stitchClipsToReel } = require("./video");
+const { postProcessReel } = require("./postprocess");
+
+// New independent audio module.
+const { addBackgroundMusic } = require("./music/audio");
+
+const { sendFinalVideoToTelegram } = require("./telegram");
+const { clearGeneratedFolders } = require("./cleanup");
+const { resolveUserChoices: resolveConfiguredChoices } = require("./mode");
 
 function resolveUserChoices() {
-  const choices = resolveConfiguredChoices(
-    process.env,
-    DEFAULT_AFFILIATE_TAG,
-  );
+  const choices = resolveConfiguredChoices(process.env, DEFAULT_AFFILIATE_TAG);
 
   console.log(`🎥 Reel mode from configuration: ${choices.videoMode}`);
+
   return choices;
 }
 
@@ -43,26 +42,26 @@ function createGenerationSignature(videoMode, products) {
   if (!fs.existsSync(CHARACTER_IMAGE_PATH)) {
     throw new Error(
       `Fixed character image not found: ${CHARACTER_IMAGE_PATH}. ` +
-      'Check CHARACTER_IMAGE_PATH in your .env file.',
+        "Check CHARACTER_IMAGE_PATH in your .env file.",
     );
   }
 
-  const chosenProducts =
-    videoMode === 'OPTION_B'
+  const selectedProducts =
+    videoMode === "OPTION_B"
       ? products.slice(0, 1)
       : products.slice(0, CLIP_COUNT);
 
   const characterHash = crypto
-    .createHash('sha256')
+    .createHash("sha256")
     .update(fs.readFileSync(CHARACTER_IMAGE_PATH))
-    .digest('hex');
+    .digest("hex");
 
   const signatureData = JSON.stringify({
     version: 1,
     videoMode,
     clipCount: CLIP_COUNT,
     characterHash,
-    selectedProducts: chosenProducts.map((product) => ({
+    selectedProducts: selectedProducts.map((product) => ({
       id: product.id,
       asin: product.asin,
       title: product.title,
@@ -70,128 +69,106 @@ function createGenerationSignature(videoMode, products) {
     })),
   });
 
-  return crypto
-    .createHash('sha256')
-    .update(signatureData)
-    .digest('hex');
+  return crypto.createHash("sha256").update(signatureData).digest("hex");
 }
 
 function buildAffiliateCaption(products, videoMode, affiliateTag) {
-  const chosenProducts =
-    videoMode === 'OPTION_B'
+  const selectedProducts =
+    videoMode === "OPTION_B"
       ? products.slice(0, 1)
       : products.slice(0, CLIP_COUNT);
 
-  return chosenProducts.map((product, index) => {
-    const rawUrl =
-      product.productUrl || product.url || product.link;
+  return selectedProducts.map((product, index) => {
+    const productUrl = product.productUrl || product.url || product.link;
 
     const affiliateUrl = buildAffiliateUrl(
-      rawUrl,
+      productUrl,
       product.asin,
       affiliateTag,
     );
 
-    if (videoMode === 'OPTION_B') {
-      return (
-        `👗 Featured Outfit (${product.price || ''}):\n` +
-        affiliateUrl
-      );
+    if (videoMode === "OPTION_B") {
+      return `👗 Featured Outfit (${product.price || ""}):\n` + affiliateUrl;
     }
 
     return (
-      `${index + 1}. ${(product.title || 'Amazon Find').slice(0, 38)}` +
-      `... (${product.price || ''})\n${affiliateUrl}`
+      `${index + 1}. ${(product.title || "Amazon Find").slice(0, 38)}... ` +
+      `(${product.price || ""})\n${affiliateUrl}`
     );
   });
 }
 
 async function run() {
   try {
-    const selectedJsonPath = path.join(
-      ROOT,
-      'selected_dresses.json',
-    );
+    const selectedDressesPath = path.join(ROOT, "selected_dresses.json");
 
-    if (!fs.existsSync(selectedJsonPath)) {
+    if (!fs.existsSync(selectedDressesPath)) {
       throw new Error(
-        'selected_dresses.json not found! Run phase1-scraper-bot.js first.',
+        "selected_dresses.json not found! " +
+          "Run phase1-scraper-bot.js first.",
       );
     }
 
-    const selectedProducts = JSON.parse(
-      fs.readFileSync(selectedJsonPath, 'utf8'),
-    );
+    const products = JSON.parse(fs.readFileSync(selectedDressesPath, "utf8"));
 
-    if (
-      !Array.isArray(selectedProducts) ||
-      selectedProducts.length === 0
-    ) {
+    if (!Array.isArray(products) || products.length === 0) {
       throw new Error(
-        'selected_dresses.json is empty or is not a valid product array.',
+        "selected_dresses.json is empty or is not a valid product array.",
       );
     }
 
     const { videoMode, affiliateTag } = await resolveUserChoices();
 
-    if (
-      videoMode !== 'OPTION_B' &&
-      selectedProducts.length < CLIP_COUNT
-    ) {
+    if (videoMode !== "OPTION_B" && products.length < CLIP_COUNT) {
       throw new Error(
-        `CLIP_COUNT is ${CLIP_COUNT}, but only ${selectedProducts.length} ` +
-        'products are selected. Select enough products or lower CLIP_COUNT ' +
-        'in src/phase2/config.js.',
+        `CLIP_COUNT is ${CLIP_COUNT}, but only ${products.length} ` +
+          "products are selected. Select enough products or lower " +
+          "CLIP_COUNT in src/phase2/config.js.",
       );
     }
 
     console.log(
-      `\n📦 Loaded ${selectedProducts.length} picks | ` +
-      `Mode: ${videoMode} | Affiliate Tag: ${affiliateTag}`,
+      `\n📦 Loaded ${products.length} picks | Mode: ${videoMode} | ` +
+        `Affiliate Tag: ${affiliateTag}`,
     );
 
     const affiliateLinks = buildAffiliateCaption(
-      selectedProducts,
+      products,
       videoMode,
       affiliateTag,
     );
 
     const prepareImagesOnly =
-      String(process.env.PREPARE_IMAGES_ONLY || '')
+      String(process.env.PREPARE_IMAGES_ONLY || "")
         .trim()
-        .toLowerCase() === 'true';
+        .toLowerCase() === "true";
 
-    const testOneClip =
-      String(process.env.FLOW_TEST_ONE_CLIP || '')
+    const oneClipTest =
+      String(process.env.FLOW_TEST_ONE_CLIP || "")
         .trim()
-        .toLowerCase() === 'true';
+        .toLowerCase() === "true";
 
     let clipPaths = Array.from({ length: CLIP_COUNT }, (_, index) =>
       path.join(DIRS.clips, `clip_${index + 1}.mp4`),
     );
 
-    const manifestPath = path.join(
-      DIRS.clips,
-      '.generation-manifest.json',
-    );
+    const manifestPath = path.join(DIRS.clips, ".generation-manifest.json");
 
-    if (testOneClip) {
+    if (oneClipTest) {
       fs.rmSync(manifestPath, { force: true });
     }
 
     const signature = prepareImagesOnly
       ? null
-      : createGenerationSignature(videoMode, selectedProducts);
+      : createGenerationSignature(videoMode, products);
 
-    let matchingManifest = false;
+    let manifestMatches = false;
 
     if (fs.existsSync(manifestPath)) {
       try {
-        const manifest = JSON.parse(
-          fs.readFileSync(manifestPath, 'utf8'),
-        );
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
-        matchingManifest =
+        manifestMatches =
           Boolean(signature) &&
           manifest.version === 1 &&
           manifest.signature === signature;
@@ -203,15 +180,14 @@ async function run() {
     }
 
     const allClipsExist = clipPaths.every(
-      (filePath) =>
-        fs.existsSync(filePath) &&
-        fs.statSync(filePath).size > 1024,
+      (clipPath) =>
+        fs.existsSync(clipPath) && fs.statSync(clipPath).size > 1024,
     );
 
     if (
       !prepareImagesOnly &&
-      !testOneClip &&
-      matchingManifest &&
+      !oneClipTest &&
+      manifestMatches &&
       allClipsExist
     ) {
       console.log(
@@ -219,110 +195,92 @@ async function run() {
       );
 
       console.log(
-        '⚡ Skipping Google Flow generation and jumping straight to FFmpeg stitcher...',
+        "⚡ Skipping Google Flow generation and jumping straight to FFmpeg stitcher...",
       );
     } else {
-      const tasks = [];
+      const generationItems = [];
 
-      if (videoMode === 'OPTION_B') {
-        const product = selectedProducts[0];
+      if (videoMode === "OPTION_B") {
+        const product = products[0];
 
-        const originalImage = path.join(
-          DIRS.tempImages,
-          'dress_1.jpg',
-        );
+        const dressPath = path.join(DIRS.tempImages, "dress_1.jpg");
 
-        const preparedImage = path.join(
-          DIRS.tempImages,
-          'dress_1_faceblur.jpg',
-        );
+        const faceBlurPath = path.join(DIRS.tempImages, "dress_1_faceblur.jpg");
 
         await downloadImage(
           product.imageUrl || product.image || product.img,
-          originalImage,
+          dressPath,
         );
 
-        await prepareDressReferenceImage(
-          originalImage,
-          preparedImage,
-        );
+        await prepareDressReferenceImage(dressPath, faceBlurPath);
 
         if (!prepareImagesOnly) {
-          const promptCount = testOneClip ? 1 : CLIP_COUNT;
+          const promptCount = oneClipTest ? 1 : CLIP_COUNT;
 
           const prompts = await generateSilentModelPrompts(
-            originalImage,
-            product.title || 'Festive Dress',
+            dressPath,
+            product.title || "Festive Dress",
             promptCount,
           );
 
           for (let index = 0; index < promptCount; index += 1) {
-            tasks.push({
-              title: `${product.title || 'Dress'} (Pose ${index + 1})`,
-              imagePath: preparedImage,
+            generationItems.push({
+              title: `${product.title || "Dress"} (Pose ${index + 1})`,
+              imagePath: faceBlurPath,
               prompt: prompts[index] || prompts[0],
             });
           }
         }
       } else {
-        const productsToPrepare = selectedProducts.slice(
+        const selectedProducts = products.slice(
           0,
-          testOneClip ? 1 : CLIP_COUNT,
+          oneClipTest ? 1 : CLIP_COUNT,
         );
 
-        for (
-          let index = 0;
-          index < productsToPrepare.length;
-          index += 1
-        ) {
-          const product = productsToPrepare[index];
+        for (let index = 0; index < selectedProducts.length; index += 1) {
+          const product = selectedProducts[index];
 
-          const originalImage = path.join(
+          const dressPath = path.join(
             DIRS.tempImages,
             `dress_${index + 1}.jpg`,
           );
 
-          const preparedImage = path.join(
+          const faceBlurPath = path.join(
             DIRS.tempImages,
             `dress_${index + 1}_faceblur.jpg`,
           );
 
           await downloadImage(
             product.imageUrl || product.image || product.img,
-            originalImage,
+            dressPath,
           );
 
-          await prepareDressReferenceImage(
-            originalImage,
-            preparedImage,
-          );
+          await prepareDressReferenceImage(dressPath, faceBlurPath);
 
-          if (prepareImagesOnly) continue;
+          if (prepareImagesOnly) {
+            continue;
+          }
 
           const [prompt] = await generateSilentModelPrompts(
-            originalImage,
+            dressPath,
             product.title || `Dress ${index + 1}`,
             1,
           );
 
-          tasks.push({
+          generationItems.push({
             title: product.title || `Dress ${index + 1}`,
-            imagePath: preparedImage,
+            imagePath: faceBlurPath,
             prompt,
           });
         }
       }
 
       if (prepareImagesOnly) {
-        console.log('\n✅ Image preparation completed.');
-
+        console.log("\n✅ Image preparation completed.");
         console.log(
           `📂 Check the prepared reference images inside: ${DIRS.tempImages}`,
         );
-
-        console.log(
-          '🧪 Test-only mode enabled: Google Flow was not launched.',
-        );
+        console.log("🧪 Test-only mode enabled: Google Flow was not launched.");
 
         return;
       }
@@ -330,101 +288,111 @@ async function run() {
       if (!fs.existsSync(CHARACTER_IMAGE_PATH)) {
         throw new Error(
           `Fixed character image not found: ${CHARACTER_IMAGE_PATH}. ` +
-          'Check CHARACTER_IMAGE_PATH in your .env file.',
+            "Check CHARACTER_IMAGE_PATH in your .env file.",
         );
       }
 
-      for (const task of tasks) {
-        task.characterImagePath = CHARACTER_IMAGE_PATH;
+      for (const item of generationItems) {
+        item.characterImagePath = CHARACTER_IMAGE_PATH;
       }
 
       console.log(
         `✅ Fixed character image validated: ${CHARACTER_IMAGE_PATH}`,
       );
 
-      const tasksToGenerate = testOneClip
-        ? tasks.slice(0, 1)
-        : tasks;
+      const generationBatch = oneClipTest
+        ? generationItems.slice(0, 1)
+        : generationItems;
 
-      clipPaths = await generateClipsInFlow(tasksToGenerate);
+      clipPaths = await generateClipsInFlow(generationBatch);
 
-      if (testOneClip) {
-        console.log(
-          '\n✅ One-clip test finished. Check clips/clip_1.mp4.',
-        );
+      if (oneClipTest) {
+        console.log("\n✅ One-clip test finished. Check clips/clip_1.mp4.");
 
         console.log(
-          '⏭️ Skipping FFmpeg stitching and Telegram delivery for this test.',
+          "⏭️ Skipping FFmpeg stitching and Telegram delivery for this test.",
         );
 
         return;
       }
 
-      if (
+      const generatedClipsAreValid =
         clipPaths.length === CLIP_COUNT &&
         clipPaths.every(
-          (filePath) =>
-            fs.existsSync(filePath) &&
-            fs.statSync(filePath).size > 1024,
-        )
-      ) {
+          (clipPath) =>
+            fs.existsSync(clipPath) && fs.statSync(clipPath).size > 1024,
+        );
+
+      if (generatedClipsAreValid) {
         fs.writeFileSync(
           manifestPath,
           JSON.stringify(
-            { version: 1, signature },
+            {
+              version: 1,
+              signature,
+            },
             null,
             2,
           ),
-          'utf8',
+          "utf8",
         );
       }
     }
 
-    // Step 1: Use the existing FFmpeg stitcher.
-    const stitchedReel = stitchClipsToReel(clipPaths);
+    // Existing step 1: stitch the generated clips.
+    const stitchedVideoPath = stitchClipsToReel(clipPaths);
 
-    // Step 2: Add category-based overlays and optional music.
-    const categoryProducts =
-      videoMode === 'OPTION_B'
-        ? selectedProducts.slice(0, 1)
-        : selectedProducts.slice(0, CLIP_COUNT);
+    const selectedProducts =
+      videoMode === "OPTION_B"
+        ? products.slice(0, 1)
+        : products.slice(0, CLIP_COUNT);
 
-    const enhanced = await postProcessReel(stitchedReel, {
-      products: categoryProducts,
+    // Existing step 2: apply the working text overlay.
+    const processed = await postProcessReel(stitchedVideoPath, {
+      products: selectedProducts,
       videoMode,
     });
 
-    // Step 3: Deliver the processed video through the existing Telegram module.
-    const caption =
-      `✨ Your 20-Sec AI Influencer Reel is Ready! (${videoMode})\n` +
-      `🎬 Style: ${enhanced.category.toUpperCase()}\n\n` +
-      `🛍️ Shop the Affiliate Links:\n\n${affiliateLinks.join('\n\n')}`;
+    // New step 3: independently generate and mix background music.
+    // Failure inside this module falls back to the processed video.
+    const musicResult = await addBackgroundMusic(processed.videoPath, {
+      category: processed.category,
+      products: selectedProducts,
+      videoMode,
+    });
 
+    const finalVideoPath = musicResult.videoPath;
+
+    console.log(`🎵 Background music result: ${musicResult.source}`);
+
+    // Existing Telegram caption and affiliate links.
+    const telegramCaption =
+      `✨ Your 20-Sec AI Influencer Reel is Ready! (${videoMode})\n` +
+      `🎬 Style: ${processed.category.toUpperCase()}\n\n` +
+      `🛍️ Shop the Affiliate Links:\n\n` +
+      affiliateLinks.join("\n\n");
+
+    // Only the video path changes: send the final music-enhanced video.
     const delivered = await sendFinalVideoToTelegram(
-      enhanced.videoPath,
-      caption,
+      finalVideoPath,
+      telegramCaption,
     );
 
-    const cleanupAfterDelivery =
-      !['false', '0', 'no', 'off'].includes(
-        String(process.env.CLEANUP_AFTER_DELIVERY || 'true')
-          .trim()
-          .toLowerCase(),
-      );
+    const cleanupAfterDelivery = !["false", "0", "no", "off"].includes(
+      String(process.env.CLEANUP_AFTER_DELIVERY || "true")
+        .trim()
+        .toLowerCase(),
+    );
 
     if (delivered && cleanupAfterDelivery) {
-      clearGeneratedFolders([
-        DIRS.clips,
-        DIRS.output,
-        DIRS.tempImages,
-      ]);
+      clearGeneratedFolders([DIRS.clips, DIRS.output, DIRS.tempImages]);
 
       console.log(
-        '🧹 Cleared clips, output, and temp_images after Telegram delivery.',
+        "🧹 Cleared clips, output, and temp_images after Telegram delivery.",
       );
     } else if (delivered) {
       console.log(
-        'ℹ️ Keeping generated files; CLEANUP_AFTER_DELIVERY is disabled.',
+        "ℹ️ Keeping generated files; CLEANUP_AFTER_DELIVERY is disabled.",
       );
     }
 
@@ -432,10 +400,7 @@ async function run() {
       '\n🎉 ALL DONE! Check your Telegram Bot or the "output" folder in VS Code.',
     );
   } catch (error) {
-    console.error(
-      '\n❌ Phase 2 Pipeline Error:',
-      error.message,
-    );
+    console.error("\n❌ Phase 2 Pipeline Error:", error.message);
 
     process.exitCode = 1;
   }
