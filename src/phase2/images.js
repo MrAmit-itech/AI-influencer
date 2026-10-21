@@ -2,6 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
 const { GEMINI_API_KEY } = require("./config");
+const GEMINI_VIDEO_PROMPT_PATH = path.join(
+  __dirname,
+  "flow",
+  "gemini-video-prompt.txt",
+);
 
 let cachedWorkingModels = null;
 
@@ -293,8 +298,11 @@ function buildLocalBackupPrompts(dressTitle, count = 1) {
 async function generateSilentModelPrompts(imagePath, dressTitle, count = 1) {
   const imageBytes = fs.readFileSync(imagePath);
   const base64Image = imageBytes.toString("base64");
-  const promptInstruction =
-    `Analyze this women's dress image ("${dressTitle}") for Google Flow (Omni 1.1 Flash, Ingredients mode).\nWrite ${count} vertical 9:16 video generation prompt(s).\nRules:\n1. Silent Indian female fashion model wearing the exact uploaded dress (describe color, fabric, cut, embroidery). No speaking or lip movement.\n2. Smooth 4-second slow-motion movement + subtle camera movement.\n3. Matching luxury/festive Pinterest backdrop with golden-hour lighting.\nReturn ONLY a valid JSON array of ${count} string prompt(s). No markdown blocks.`.trim();
+  const promptInstruction = fs
+    .readFileSync(GEMINI_VIDEO_PROMPT_PATH, "utf8")
+    .replace(/\{\{dressTitle\}\}/g, () => dressTitle)
+    .replace(/\{\{count\}\}/g, () => String(count))
+    .trim();
   const modelsToTry = await getAvailableVisionModels();
   for (const modelName of modelsToTry) {
     for (let attempt = 1; attempt <= 2; attempt++) {

@@ -11,6 +11,10 @@ const CHARACTER_IMAGE_PATH = path.isAbsolute(CHARACTER_IMAGE_RAW)
   : path.resolve(ROOT, CHARACTER_IMAGE_RAW);
 const DEFAULT_AFFILIATE_TAG = (process.env.AMAZON_AFFILIATE_TAG || "yourtag-21").trim();
 const FLOW_URL = "https://labs.google/fx/tools/flow";
+const CLIP_COUNT = Number(process.env.CLIP_COUNT || 5);
+if (!Number.isInteger(CLIP_COUNT) || CLIP_COUNT < 1) {
+  throw new Error("CLIP_COUNT in .env must be a positive whole number.");
+}
 if (!GEMINI_API_KEY) {
   console.error("? Missing GEMINI_API_KEY in your .env file!");
   process.exit(1);
@@ -27,4 +31,4 @@ Object.values(DIRS).forEach((dir) => {
 const FLOW_GENERATION_TIMEOUT_MS = Math.max(60000, Number(process.env.FLOW_GENERATION_TIMEOUT_MS || 240000));
 const FLOW_DOWNLOAD_TIMEOUT_MS = Math.max(10000, Number(process.env.FLOW_DOWNLOAD_TIMEOUT_MS || 45000));
 
-module.exports = { ROOT, BOT_TOKEN, CHAT_ID, GEMINI_API_KEY, CHARACTER_IMAGE_PATH, DEFAULT_AFFILIATE_TAG, FLOW_URL, DIRS, FLOW_GENERATION_TIMEOUT_MS, FLOW_DOWNLOAD_TIMEOUT_MS };
+module.exports = { ROOT, BOT_TOKEN, CHAT_ID, GEMINI_API_KEY, CHARACTER_IMAGE_PATH, DEFAULT_AFFILIATE_TAG, FLOW_URL, DIRS, CLIP_COUNT, FLOW_GENERATION_TIMEOUT_MS, FLOW_DOWNLOAD_TIMEOUT_MS };

@@ -1,0 +1,17 @@
+Analyze the uploaded women's dress image ("{{dressTitle}}") and create {{count}} video generation prompt(s) for Google Flow (Omni 1.1 Flash, Ingredients mode).
+
+For each prompt, create a clean, elegant, premium fashion showcase that highlights the dress.
+
+Rules:
+1. Preserve the exact uploaded dress, including its color, fabric, print, embroidery, neckline, sleeves, fit, and design. Do not add, remove, or alter any details.
+2. Use the same Indian female model from the uploaded character reference. Keep her face, appearance, and body consistent.
+3. Keep the dress as the main focus. Show a clear, full-body view from head to toe so the entire outfit is visible.
+4. Use a clean, minimal, elegant background with soft, natural lighting. Avoid clutter, distracting decorations, busy patterns, and unnecessary props.
+5. Use simple, graceful movements such as a gentle turn, a small step, or a subtle pose change to showcase the dress naturally.
+6. Use smooth, slow movement and subtle camera motion. Keep the dress clearly visible and in focus throughout the 4-second vertical 9:16 video.
+7. No speaking, lip movement, exaggerated gestures, dramatic effects, text, logos, or watermarks.
+8. Keep the overall look neat, realistic, premium, and suitable for an Indian women's fashion Instagram Reel.
+9. Do not introduce additional outfits, accessories, or design elements that are not present in the reference image.
+10. Make each prompt distinct through a subtle change in pose or camera movement while preserving the same dress, model, and clean visual style.
+
+Return ONLY a valid JSON array containing exactly {{count}} string prompts. No markdown or additional text.

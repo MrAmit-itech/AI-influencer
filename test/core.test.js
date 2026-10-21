@@ -1,5 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 const { escapeHtml, toHighResAmazonImage } = require("../src/phase1/utils");
 const { buildAffiliateUrl } = require("../src/phase2/products");
@@ -12,7 +15,9 @@ const {
 const { getFlowMediaSnapshot } = require("../src/phase2/flow/page");
 const {
   FLOW_DOWNLOAD_TIMEOUT_MS,
+  CLIP_COUNT,
 } = require("../src/phase2/config");
+const { clearGeneratedFolders } = require("../src/phase2/cleanup");
 const {
   findUploadedProjectAsset,
   resetFlowPromptIngredients,
@@ -61,6 +66,21 @@ test("Flow download module receives its configured timeout", () => {
   assert.equal(typeof flowDownloads.attemptFlowDownload, "function");
 });
 
+test("generated-folder cleanup removes contents but preserves folders", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ai-influencer-cleanup-"));
+  const generatedFolder = path.join(tempRoot, "clips");
+  fs.mkdirSync(path.join(generatedFolder, "nested"), { recursive: true });
+  fs.writeFileSync(path.join(generatedFolder, "clip.mp4"), "clip");
+  fs.writeFileSync(path.join(generatedFolder, "nested", "temp.txt"), "temp");
+
+  try {
+    clearGeneratedFolders([generatedFolder]);
+    assert.deepEqual(fs.readdirSync(generatedFolder), []);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("Flow video settings are centralized with the existing defaults", () => {
   assert.deepEqual(FLOW_VIDEO_SETTINGS, {
     generationMode: "Video",
@@ -71,6 +91,10 @@ test("Flow video settings are centralized with the existing defaults", () => {
     duration: "4s",
     outputs: "x1",
   });
+});
+
+test("clip count is read from the environment configuration", () => {
+  assert.equal(CLIP_COUNT, 2);
 });
 
 test("Flow locator polling supports scoped locators without page wait helpers", async () => {

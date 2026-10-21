@@ -40,7 +40,7 @@ async function sendFinalVideoToTelegram(videoPath, captionText) {
     console.log(
       'ℹ️ Telegram Chat ID not set. Open your finished Reel inside the "output" folder.',
     );
-    return;
+    return false;
   }
   console.log(
     "\n📲 Uploading finished 20-sec Reel & Affiliate Links to Telegram...",
@@ -62,6 +62,7 @@ async function sendFinalVideoToTelegram(videoPath, captionText) {
   if (!data.ok)
     throw new Error(`Telegram video upload failed: ${data.description}`);
   console.log("✅ Delivered 20-sec Reel to your Telegram Bot!");
+  return true;
 }
 
 module.exports = { sendFinalVideoToTelegram };
