@@ -12,12 +12,15 @@ const {
   CLIP_COUNT,
 } = require("./config");
 
+const { publishReel, buildInstagramCaption } = require("./instagram/publisher");
+
 const { downloadImage, buildAffiliateUrl } = require("./products");
 
 const {
   prepareDressReferenceImage,
   generateSilentModelPrompts,
 } = require("./images");
+
 
 const { generateClipsInFlow } = require("./flow/generator");
 const { stitchClipsToReel } = require("./video");
@@ -26,7 +29,7 @@ const { postProcessReel } = require("./postprocess");
 // New independent audio module.
 const { addBackgroundMusic } = require("./music/audio");
 
-const { sendFinalVideoToTelegram } = require("./telegram");
+const { sendFinalVideoForApproval } = require("./telegram-approval");
 const { clearGeneratedFolders } = require("./cleanup");
 const { resolveUserChoices: resolveConfiguredChoices } = require("./mode");
 
@@ -373,10 +376,56 @@ async function run() {
       affiliateLinks.join("\n\n");
 
     // Only the video path changes: send the final music-enhanced video.
-    const delivered = await sendFinalVideoToTelegram(
+    // Step 4: Send the final music-enhanced video for Telegram approval.
+
+    const approvalResult = await sendFinalVideoForApproval(
       finalVideoPath,
       telegramCaption,
     );
+
+    const instagramPublishEnabled =
+      String(process.env.INSTAGRAM_PUBLISH_ENABLED || "false")
+        .trim()
+        .toLowerCase() === "true";
+
+    let instagramPublished = false;
+
+    if (approvalResult === "confirmed") {
+      console.log("✅ Telegram approval received.");
+
+      if (!instagramPublishEnabled) {
+        console.log(
+          "⏸️ Instagram publishing is disabled. " +
+            "Set INSTAGRAM_PUBLISH_ENABLED=true when ready.",
+        );
+        console.log("ℹ️ Keeping the generated video files.");
+      } else {
+        console.log("📤 Starting Instagram publishing...");
+
+        const instagramCaption = buildInstagramCaption(processed.category);
+
+        const instagramResult = await publishReel({
+          videoPath: finalVideoPath,
+          caption: instagramCaption,
+        });
+
+        instagramPublished = true;
+
+        console.log("✅ Instagram publishing completed.");
+
+        if (instagramResult.permalink) {
+          console.log(`🔗 Instagram Reel: ${instagramResult.permalink}`);
+        } else {
+          console.log(`🆔 Instagram media ID: ${instagramResult.mediaId}`);
+        }
+      }
+    } else if (approvalResult === "rejected") {
+      console.log("❌ User rejected the Reel. Instagram publishing skipped.");
+    } else {
+      console.log(
+        "⚠️ No completed approval decision. Instagram publishing skipped.",
+      );
+    }
 
     const cleanupAfterDelivery = !["false", "0", "no", "off"].includes(
       String(process.env.CLEANUP_AFTER_DELIVERY || "true")
@@ -384,16 +433,20 @@ async function run() {
         .toLowerCase(),
     );
 
-    if (delivered && cleanupAfterDelivery) {
+    // Clean after rejection or successful publishing.
+    // Keep files if publishing is disabled or the publishing call fails.
+    const safeToCleanup = approvalResult === "rejected" || instagramPublished;
+
+    if (safeToCleanup && cleanupAfterDelivery) {
       clearGeneratedFolders([DIRS.clips, DIRS.output, DIRS.tempImages]);
 
-      console.log(
-        "🧹 Cleared clips, output, and temp_images after Telegram delivery.",
-      );
-    } else if (delivered) {
+      console.log("🧹 Cleared clips, output, and temp_images after review.");
+    } else if (safeToCleanup) {
       console.log(
         "ℹ️ Keeping generated files; CLEANUP_AFTER_DELIVERY is disabled.",
       );
+    } else {
+      console.log("ℹ️ Generated files retained for inspection or retry.");
     }
 
     console.log(
